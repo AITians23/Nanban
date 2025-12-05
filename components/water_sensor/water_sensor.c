@@ -1,20 +1,8 @@
-#include <stdio.h>
-#include <string.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
-
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "nvs_flash.h"
-#include "esp_log.h"
-#include "mqtt_client.h"
-#include "esp_netif.h"
 #include "water_sensor.h"    // Your custom component
 
-#define WIFI_SSID      "WIFI18-D8"
-#define WIFI_PASS      "12345678"
+// Macros
+#define WIFI_SSID      "Radinnolabs"
+#define WIFI_PASS      "Rlabs@2023"
 
 #define MQTT_BROKER_URI "mqtts://esp32user:tnau1234@302e0df2bf084106ae7ee162f3ab3471.s1.eu.hivemq.cloud:8883"
 
@@ -73,11 +61,25 @@ static void wifi_event_handler(void *arg,
     }
 }
 
+void init_nvs()
+{
+    // 1. Initialize NVS
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+}
+
 // =====================================================
 // Wi-Fi Initialization (Correct ESP-IDF v5.x Format)
 // =====================================================
-static void wifi_init(void)
+void wifi_init(void)
 {
+    init_nvs();
+
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_create_default_wifi_sta();
@@ -113,7 +115,7 @@ static void wifi_init(void)
 // =====================================================
 // MQTT Start (Secure HiveMQ Cloud)
 // =====================================================
-static void mqtt_start(void)
+void mqtt_start(void)
 {
     esp_mqtt_client_config_t mqtt_cfg = {
         .broker.address.uri = MQTT_BROKER_URI,
@@ -173,41 +175,4 @@ static void water_event_task(void *pvParameters)
             publish_water_status(water_state);
         }
     }
-}
-
-// =====================================================
-// Main Application
-// =====================================================
-void app_main(void)
-{
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
-        ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        nvs_flash_erase();
-        nvs_flash_init();
-    }
-
-    ESP_LOGI(TAG, "Initializing Wi-Fi...");
-    wifi_init();
-
-    ESP_LOGI(TAG, "Starting MQTT...");
-    mqtt_start();
-
-    ESP_LOGI(TAG, "Initializing Water Sensor...");
-    // water_sensor_init(WATER_GPIO);
-
-    // Create event queue
-    water_event_queue = xQueueCreate(5, sizeof(int));
-
-    // Task to publish water level changes
-    xTaskCreate(water_event_task,
-                "water_event_task",
-                4096,
-                NULL,
-                5,
-                NULL);
-
-    ESP_LOGI(TAG, "System Initialized Successfully!");
 }
